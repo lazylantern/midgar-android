@@ -3,11 +3,17 @@ package com.lazylantern.midgar;
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import android.support.v4.app.Fragment
+import android.support.v4.app.FragmentManager
+import android.support.v7.app.AppCompatActivity
+import android.util.Log
 import java.util.*
+import kotlin.collections.HashMap
 
 open class MidgarApplication : Application(), Application.ActivityLifecycleCallbacks {
 
-    var lastScreenHash: String = ""
+    var lastHierarchyHash: String = ""
+    var managers: HashMap<FragmentManager, FragmentManager.FragmentLifecycleCallbacks> = HashMap()
 
     override fun onCreate() {
         super.onCreate()
@@ -20,35 +26,75 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
         }
     }
 
-    companion object {
-        fun registerFragmentManager(){
-
+    private fun handleHierarchyChange(activity: Activity?) {
+        val newHierarchyHash = computeScreenHierarchyHash(activity)
+        if (newHierarchyHash != lastHierarchyHash){
+            Log.d(this.packageName, "Got a new hierarchy: $newHierarchyHash")
         }
     }
 
-    private fun handleHierarchyChange() {
+    private fun registerFragmentManager(activity: Activity?) {
+        if (activity is AppCompatActivity){
+            val fm = activity.supportFragmentManager
+            val callbacks = object: FragmentManager.FragmentLifecycleCallbacks(){
+                override fun onFragmentStarted(fm: FragmentManager, f: Fragment) {
+                    super.onFragmentStarted(fm, f)
+                    handleHierarchyChange(f.activity)
+                }
 
+                override fun onFragmentStopped(fm: FragmentManager, f: Fragment) {
+                    super.onFragmentStopped(fm, f)
+                    handleHierarchyChange(f.activity)
+                }
+
+            }
+            fm.registerFragmentLifecycleCallbacks(callbacks, true)
+            managers[fm] = callbacks
+        }
     }
 
-    fun computeScreenHierarchyHash(): String {
-        return ""
+    private fun unregisterFragmentManager(activity: Activity?) {
+        if (activity is AppCompatActivity){
+            val fm = activity.supportFragmentManager
+            val callbacks = managers[fm]
+            if(callbacks != null){
+                fm.unregisterFragmentLifecycleCallbacks(callbacks)
+            }
+        }
+    }
+
+    private fun computeScreenHierarchyHash(activity: Activity?): String {
+        return activity?.javaClass!!.simpleName + " " + getVisibleFragmentsStringified(activity)
+    }
+
+    private fun getVisibleFragmentsStringified(activity: Activity?): String {
+        if(activity is AppCompatActivity){
+                val sb = StringBuilder()
+                for (f in activity.supportFragmentManager.fragments){
+                    sb.append(f.javaClass.simpleName)
+                    sb.append(" ")
+                }
+            return sb.toString()
+        }
+        return "No Fragments"
     }
 
     private fun checkIsAppEnabled(): Boolean {
         return true
     }
 
-    override fun onActivityDestroyed(activity: Activity?) {
-        handleHierarchyChange()
+    override fun onActivityPaused(activity: Activity?) {
+        unregisterFragmentManager(activity)
     }
 
-    override fun onActivityCreated(activity: Activity?, savedInstanceState: Bundle?) {
-        handleHierarchyChange()
+    override fun onActivityResumed(activity: Activity?) {
+        registerFragmentManager(activity)
+        handleHierarchyChange(activity)
     }
 
-    override fun onActivityPaused(activity: Activity?) { }
+    override fun onActivityDestroyed(activity: Activity?) { }
 
-    override fun onActivityResumed(activity: Activity?) { }
+    override fun onActivityCreated(activity: Activity?, savedInstanceState: Bundle?) { }
 
     override fun onActivityStarted(activity: Activity?) { }
 
