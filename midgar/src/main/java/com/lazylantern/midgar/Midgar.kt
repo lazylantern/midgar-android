@@ -7,23 +7,59 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.appcompat.app.AppCompatActivity
 import android.util.Log
+import androidx.annotation.WorkerThread
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.lang.RuntimeException
+import java.net.URL
 import java.util.*
+import javax.net.ssl.HttpsURLConnection
 import kotlin.collections.HashMap
+import java.io.OutputStreamWriter
+import kotlin.coroutines.CoroutineContext
 
-open class MidgarApplication : Application(), Application.ActivityLifecycleCallbacks {
+
+open class MidgarApplication : Application(), Application.ActivityLifecycleCallbacks, CoroutineScope {
+    override val coroutineContext: CoroutineContext
+        get() = Dispatchers.IO
 
     var lastHierarchyHash: String = ""
+    var midgarAppId: String = ""
     var managers: HashMap<FragmentManager, FragmentManager.FragmentLifecycleCallbacks> = HashMap()
+    var hasBeenRemotelyKilled = true
+    lateinit var apiService: ApiService
 
     override fun onCreate() {
         super.onCreate()
 
-        if(checkIsAppEnabled()){
+        launch {
+            init()
+        }
+        Log.d(this.packageName,"Midgar Init has started")
+    }
+
+    suspend private fun init() {
+        midgarAppId = getString(R.string.midgar_app_id)
+        if (midgarAppId.isBlank()){
+            throw RuntimeException("Midgar App ID not set")
+        }
+        apiService = ApiService(midgarAppId, getString(R.string.api_url))
+        this.hasBeenRemotelyKilled = apiService.checkAppStatus()
+        if(!hasBeenRemotelyKilled){
             //Register activity lifecycle callback
             registerActivityLifecycleCallbacks(this)
             //Listen for Fragment manager changes
-
         }
+    }
+
+    private fun shutdown(){
+        unregisterActivityLifecycleCallbacks(this)
+        for ((manager, callback) in managers){
+            manager.unregisterFragmentLifecycleCallbacks(callback)
+        }
+        managers.clear()
     }
 
     private fun handleHierarchyChange(activity: Activity?) {
@@ -107,3 +143,35 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
 }
 
 data class Event(val type: String, val name: String, val source: String, val timestampMs: Date)
+
+class ApiService(val appId: String, val apiUrl: String) {
+
+    @WorkerThread
+    suspend fun checkAppStatus(): Boolean{
+        val params = HashMap<String, String>()
+        params["app_token"] = this.appId
+        val connection = createPostRequest("/apps/kill", JSONObject(params).toString())
+        connection.connect()
+        val responseCode = connection.responseCode
+        if(responseCode == 200){
+            return true
+        }
+        return false
+    }
+
+    private fun createPostRequest(url: String, body: String): HttpsURLConnection {
+        val connection = URL(this.apiUrl + url ).openConnection() as HttpsURLConnection
+        with(connection){
+            readTimeout = 3000
+            connectTimeout = 3000
+            requestMethod = "POST"
+            doInput = true
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+        }
+        val out = OutputStreamWriter(connection.outputStream        )
+        out.write(body)
+        out.close()
+        return connection
+    }
+}
