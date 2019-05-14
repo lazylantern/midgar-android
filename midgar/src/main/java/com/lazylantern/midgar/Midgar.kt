@@ -71,8 +71,10 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
         if(activity is AppCompatActivity){
                 val sb = StringBuilder()
                 for (f in activity.supportFragmentManager.fragments){
-                    sb.append(f.javaClass.simpleName)
-                    sb.append(" ")
+                    if(f.isVisible){
+                        sb.append(f.javaClass.simpleName)
+                        sb.append(" ")
+                    }
                 }
             return sb.toString()
         }

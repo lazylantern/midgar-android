@@ -1,9 +1,8 @@
 package com.lazylantern.midgar.sample
 
+import android.content.Intent
 import android.os.Bundle
-import android.support.design.widget.Snackbar
 import android.support.v7.app.AppCompatActivity;
-import com.lazylantern.midgar.MidgarApplication
 import com.lazylantern.midgar.R
 
 import kotlinx.android.synthetic.main.activity_sample.*
@@ -16,8 +15,8 @@ class SampleActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
 
         fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null).show()
+            val intent = Intent(this, SubActivity::class.java)
+            startActivity(intent)
         }
     }
 
