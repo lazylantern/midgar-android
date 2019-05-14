@@ -59,6 +59,7 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
             val callbacks = managers[fm]
             if(callbacks != null){
                 fm.unregisterFragmentLifecycleCallbacks(callbacks)
+                managers.remove(fm)
             }
         }
     }

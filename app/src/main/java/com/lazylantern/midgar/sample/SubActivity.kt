@@ -5,18 +5,17 @@ import android.support.design.widget.Snackbar
 import android.support.v7.app.AppCompatActivity;
 import com.lazylantern.midgar.R
 
-import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.android.synthetic.main.activity_sub.*
 
 class SubActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_sub)
         setSupportActionBar(toolbar)
 
         fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null).show()
+            supportFragmentManager.beginTransaction().add(BlankFragment.newInstance(), "Blank Fragment").commitNow()
         }
 
         supportFragmentManager.beginTransaction().add(BlankFragment.newInstance(), "Blank Fragment").commit()

@@ -12,7 +12,7 @@
             android:theme="@style/AppTheme">
         <activity
                 android:name=".sample.SubActivity"
-                android:label="@string/title_activity_main"
+                android:label="@string/title_activity_sub"
                 android:theme="@style/AppTheme.NoActionBar">
         </activity>
         <activity
