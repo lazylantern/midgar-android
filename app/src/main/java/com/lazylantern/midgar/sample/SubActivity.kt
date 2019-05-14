@@ -15,10 +15,10 @@ class SubActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
 
         fab.setOnClickListener { view ->
-            supportFragmentManager.beginTransaction().add(BlankFragment.newInstance(), "Blank Fragment").commitNow()
+            supportFragmentManager.beginTransaction().add(R.id.fragment_host, BlankFragment.newInstance(), "Blank Fragment").commit()
         }
 
-        supportFragmentManager.beginTransaction().add(BlankFragment.newInstance(), "Blank Fragment").commit()
+        supportFragmentManager.beginTransaction().add(BlankFragment.newInstance(), "Blank Fragment not attached to the view").commit()
     }
 
 }
