@@ -247,7 +247,7 @@ class ApiService(private val appId: String, private val apiUrl: String) {
         val connection = createPostRequest("/events", JSONObject(params).toString())
         connection.connect()
         val responseCode = connection.responseCode
-        if(responseCode == 200){
+        if(responseCode < 400){
             Log.d(MidgarTracker.TAG,"Batch uploaded successfully")
         } else {
             Log.d(MidgarTracker.TAG,"Batch upload failed. Events got lost.")
