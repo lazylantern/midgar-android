@@ -22,6 +22,7 @@ import kotlin.coroutines.CoroutineContext
 
 
 open class MidgarApplication : Application(), Application.ActivityLifecycleCallbacks, CoroutineScope {
+
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.IO
 
@@ -37,7 +38,7 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
         launch {
             init()
         }
-        Log.d(this.packageName,"Midgar Init has started")
+        Log.d(MidgarApplication.TAG,"Midgar Init has started")
     }
 
     suspend private fun init() {
@@ -65,7 +66,7 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
     private fun handleHierarchyChange(activity: Activity?) {
         val newHierarchyHash = computeScreenHierarchyHash(activity)
         if (newHierarchyHash != lastHierarchyHash){
-            Log.d(this.packageName, "Got a new hierarchy: $newHierarchyHash")
+            Log.d(MidgarApplication.TAG, "Got a new hierarchy: $newHierarchyHash")
         }
     }
 
@@ -140,6 +141,10 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
     override fun onActivitySaveInstanceState(activity: Activity?, outState: Bundle?) { }
 
     override fun onActivityStopped(activity: Activity?) { }
+
+    companion object {
+        const val TAG = "MidgarSDK"
+    }
 }
 
 data class Event(val type: String, val name: String, val source: String, val timestampMs: Date)
@@ -154,8 +159,10 @@ class ApiService(val appId: String, val apiUrl: String) {
         connection.connect()
         val responseCode = connection.responseCode
         if(responseCode == 200){
+            Log.d(MidgarApplication.TAG,"Midgar App is enabled")
             return true
         }
+        Log.d(MidgarApplication.TAG,"Midgar App is DISABLED")
         return false
     }
 
