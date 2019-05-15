@@ -145,7 +145,7 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
                 val event = eventsQueue.poll()
                 events.add(event)
                 if(events.size >= MAX_UPLOAD_BATCH_SIZE){
-                    continue@dequeue
+                    break@dequeue
                 }
             }
             launch { apiService.uploadBatch(events)}
