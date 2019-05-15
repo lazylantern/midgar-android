@@ -25,7 +25,7 @@ jobs:
           name: Build aar for SDK
           command: ./gradlew :midgar:assembleRelease
       - store_artifacts:
-          path: midgar/build/outputs/aar/midgar-release.aar
+          path: midgar/build/outputs/aar/*.aar
       - run:
          name: Run lint test on sample app to make sure it builds
          command: ./gradlew :app:lintDebug
