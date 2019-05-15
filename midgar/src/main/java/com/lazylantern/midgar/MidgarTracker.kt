@@ -1,4 +1,4 @@
-package com.lazylantern.midgar;
+package com.lazylantern.midgar
 
 import android.app.Activity
 import android.app.Application
@@ -23,7 +23,7 @@ import kotlin.collections.ArrayList
 import kotlin.concurrent.schedule
 import kotlin.coroutines.CoroutineContext
 
-open class MidgarApplication : Application(), Application.ActivityLifecycleCallbacks, CoroutineScope {
+class MidgarTracker private constructor(app: Application) : Application.ActivityLifecycleCallbacks, CoroutineScope  {
 
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.IO
@@ -36,32 +36,31 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
     var eventsQueue: Queue<Event> = ArrayDeque<Event>()
     lateinit var apiService: ApiService
 
-    override fun onCreate() {
-        super.onCreate()
-
-        launch {
-            init()
-        }
-        Log.d(MidgarApplication.TAG,"Midgar Init has started")
+    init {
+        init(app)
+        Log.d(MidgarTracker.TAG,"Midgar has initialized")
     }
 
-    suspend private fun init() {
-        midgarAppId = getString(R.string.midgar_app_id)
+    private fun init(app: Application) {
+        midgarAppId = app.getString(R.string.midgar_app_id)
         if (midgarAppId.isBlank()){
             throw RuntimeException("Midgar App ID not set")
         }
-        apiService = ApiService(midgarAppId, getString(R.string.api_url))
+    }
+
+    private suspend fun start(app: Application){
+        apiService = ApiService(midgarAppId, app.getString(R.string.api_url))
         this.hasBeenRemotelyEnabled = apiService.checkAppIsEnabled()
         if(hasBeenRemotelyEnabled){
             //Register activity lifecycle callback
-            registerActivityLifecycleCallbacks(this)
+            app.registerActivityLifecycleCallbacks(this)
             startUploadLoop()
         }
     }
 
-    private fun shutdown(){
+    private fun shutdown(app: Application){
         stopUploadLoop()
-        unregisterActivityLifecycleCallbacks(this)
+        app.unregisterActivityLifecycleCallbacks(this)
         for ((manager, callback) in managers){
             manager.unregisterFragmentLifecycleCallbacks(callback)
         }
@@ -71,7 +70,7 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
     private fun handleHierarchyChange(activity: Activity?) {
         val newHierarchyHash = computeScreenHierarchyHash(activity)
         if (newHierarchyHash != lastHierarchyHash){
-            Log.d(MidgarApplication.TAG, "Got a new hierarchy: $newHierarchyHash")
+            Log.d(MidgarTracker.TAG, "Got a new hierarchy: $newHierarchyHash")
             eventsQueue.offer(createEvent(newHierarchyHash))
         }
     }
@@ -139,12 +138,12 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
 
     private fun uploadTimerTask(): TimerTask.() -> Unit {
         return {
-            Log.d(MidgarApplication.TAG, "Processing batch")
+            Log.d(MidgarTracker.TAG, "Processing batch")
             val events = ArrayList<Event>()
             dequeue@ while (!eventsQueue.isEmpty()) {
                 val event = eventsQueue.poll()
                 events.add(event)
-                if(events.size >= MAX_UPLOAD_BATCH_SIZE){
+                if(events.size >= MidgarTracker.MAX_UPLOAD_BATCH_SIZE){
                     break@dequeue
                 }
             }
@@ -175,12 +174,16 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
 
     override fun onActivityStopped(activity: Activity?) { }
 
-    public fun stop(){
-        hasBeenRemotelyEnabled = false
-        shutdown()
+    fun startTracker(app: Application){
+        launch { start(app) }
     }
 
-    companion object {
+    fun stopTracker(app: Application){
+        hasBeenRemotelyEnabled = false
+        shutdown(app)
+    }
+
+    companion object : SingletonHolder<MidgarTracker, Application>(::MidgarTracker) {
         const val TAG = "MidgarSDK"
         const val MAX_UPLOAD_BATCH_SIZE = 10
         val UPLOAD_PERIOD_MS = TimeUnit.SECONDS.toMillis(60)
@@ -213,10 +216,10 @@ class ApiService(val appId: String, val apiUrl: String) {
         connection.connect()
         val responseCode = connection.responseCode
         if(responseCode == 200){
-            Log.d(MidgarApplication.TAG,"Midgar App is enabled")
+            Log.d(MidgarTracker.TAG,"Midgar App is enabled")
             return true
         }
-        Log.d(MidgarApplication.TAG,"Midgar App is DISABLED")
+        Log.d(MidgarTracker.TAG,"Midgar App is DISABLED")
         return false
     }
 
@@ -229,9 +232,9 @@ class ApiService(val appId: String, val apiUrl: String) {
         connection.connect()
         val responseCode = connection.responseCode
         if(responseCode == 200){
-            Log.d(MidgarApplication.TAG,"Batch uploaded successfully")
+            Log.d(MidgarTracker.TAG,"Batch uploaded successfully")
         } else {
-            Log.d(MidgarApplication.TAG,"Batch upload failed. Events got lost.")
+            Log.d(MidgarTracker.TAG,"Batch upload failed. Events got lost.")
         }
     }
 
@@ -249,5 +252,29 @@ class ApiService(val appId: String, val apiUrl: String) {
         out.write(body)
         out.close()
         return connection
+    }
+}
+
+open class SingletonHolder<out T, in A>(creator: (A) -> T) {
+    private var creator: ((A) -> T)? = creator
+    @Volatile private var instance: T? = null
+
+    fun getInstance(arg: A): T {
+        val i = instance
+        if (i != null) {
+            return i
+        }
+
+        return synchronized(this) {
+            val i2 = instance
+            if (i2 != null) {
+                i2
+            } else {
+                val created = creator!!(arg)
+                instance = created
+                creator = null
+                created
+            }
+        }
     }
 }
