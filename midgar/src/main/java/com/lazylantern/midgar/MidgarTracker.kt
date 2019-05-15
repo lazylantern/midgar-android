@@ -131,7 +131,9 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
                         break@dequeue
                     }
                 }
-                launch { apiService.uploadBatch(events)}
+                if(events.size > 0){
+                    launch { apiService.uploadBatch(events)}
+                }
             } catch (e: Exception){
                 Log.e(TAG, "Midgar encountered an error while processing batch:", e)
             }
