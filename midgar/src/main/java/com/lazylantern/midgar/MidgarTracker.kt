@@ -3,23 +3,22 @@ package com.lazylantern.midgar
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentManager
-import androidx.appcompat.app.AppCompatActivity
 import android.util.Log
 import androidx.annotation.WorkerThread
+import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.lang.RuntimeException
+import java.io.OutputStreamWriter
 import java.net.URL
 import java.util.*
-import javax.net.ssl.HttpsURLConnection
-import kotlin.collections.HashMap
-import java.io.OutputStreamWriter
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.HttpsURLConnection
 import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 import kotlin.concurrent.schedule
 import kotlin.coroutines.CoroutineContext
 
@@ -28,17 +27,17 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.IO
 
-    var lastHierarchyHash: String = ""
-    var midgarAppId: String = ""
-    var managers: HashMap<FragmentManager, FragmentManager.FragmentLifecycleCallbacks> = HashMap()
-    var hasBeenRemotelyEnabled = false
-    var timer = Timer()
-    var eventsQueue: Queue<Event> = ArrayDeque<Event>()
-    lateinit var apiService: ApiService
+    private var lastHierarchyHash: String = ""
+    private var midgarAppId: String = ""
+    private var managers: HashMap<FragmentManager, FragmentManager.FragmentLifecycleCallbacks> = HashMap()
+    private var hasBeenRemotelyEnabled = false
+    private var timer = Timer()
+    private var eventsQueue: Queue<Event> = ArrayDeque<Event>()
+    private lateinit var apiService: ApiService
 
     init {
         init(app)
-        Log.d(MidgarTracker.TAG,"Midgar has initialized")
+        Log.d(TAG,"Midgar has initialized")
     }
 
     private fun init(app: Application) {
@@ -48,29 +47,39 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         }
     }
 
-    private suspend fun start(app: Application){
+    private fun start(app: Application){
         apiService = ApiService(midgarAppId, app.getString(R.string.api_url))
-        this.hasBeenRemotelyEnabled = apiService.checkAppIsEnabled()
-        if(hasBeenRemotelyEnabled){
-            //Register activity lifecycle callback
-            app.registerActivityLifecycleCallbacks(this)
-            startUploadLoop()
+        try{
+            this.hasBeenRemotelyEnabled = apiService.checkAppIsEnabled()
+            if(hasBeenRemotelyEnabled){
+                //Register activity lifecycle callback
+                app.registerActivityLifecycleCallbacks(this)
+                startUploadLoop()
+            }
+        } catch (e: Exception){
+            Log.e(TAG, "Midgar failed to start:", e)
         }
+
     }
 
     private fun shutdown(app: Application){
-        stopUploadLoop()
-        app.unregisterActivityLifecycleCallbacks(this)
-        for ((manager, callback) in managers){
-            manager.unregisterFragmentLifecycleCallbacks(callback)
+        try {
+            stopUploadLoop()
+            app.unregisterActivityLifecycleCallbacks(this)
+            for ((manager, callback) in managers){
+                manager.unregisterFragmentLifecycleCallbacks(callback)
+            }
+            managers.clear()
+        } catch (e: Exception){
+            Log.e(TAG, "Midgar failed to shutdown:", e)
         }
-        managers.clear()
+
     }
 
     private fun handleHierarchyChange(activity: Activity?) {
         val newHierarchyHash = computeScreenHierarchyHash(activity)
         if (newHierarchyHash != lastHierarchyHash){
-            Log.d(MidgarTracker.TAG, "Got a new hierarchy: $newHierarchyHash")
+            Log.d(TAG, "Got a new hierarchy: $newHierarchyHash")
             eventsQueue.offer(createEvent(newHierarchyHash))
         }
     }
@@ -138,16 +147,20 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
 
     private fun uploadTimerTask(): TimerTask.() -> Unit {
         return {
-            Log.d(MidgarTracker.TAG, "Processing batch")
-            val events = ArrayList<Event>()
-            dequeue@ while (!eventsQueue.isEmpty()) {
-                val event = eventsQueue.poll()
-                events.add(event)
-                if(events.size >= MidgarTracker.MAX_UPLOAD_BATCH_SIZE){
-                    break@dequeue
+            Log.d(TAG, "Processing batch")
+            try{
+                val events = ArrayList<Event>()
+                dequeue@ while (!eventsQueue.isEmpty()) {
+                    val event = eventsQueue.poll()
+                    events.add(event)
+                    if(events.size >= MAX_UPLOAD_BATCH_SIZE){
+                        break@dequeue
+                    }
                 }
+                launch { apiService.uploadBatch(events)}
+            } catch (e: Exception){
+                Log.e(TAG, "Midgar encountered an error while processing batch:", e)
             }
-            launch { apiService.uploadBatch(events)}
         }
     }
 
@@ -206,10 +219,10 @@ data class Event(val type: String, val name: String, val source: String, val tim
     }
 }
 
-class ApiService(val appId: String, val apiUrl: String) {
+class ApiService(private val appId: String, private val apiUrl: String) {
 
     @WorkerThread
-    suspend fun checkAppIsEnabled(): Boolean{
+    fun checkAppIsEnabled(): Boolean{
         val params = HashMap<String, String>()
         params["app_token"] = this.appId
         val connection = createPostRequest("/apps/kill", JSONObject(params).toString())
@@ -224,7 +237,7 @@ class ApiService(val appId: String, val apiUrl: String) {
     }
 
     @WorkerThread
-    suspend fun uploadBatch(events: List<Event>){
+    fun uploadBatch(events: List<Event>){
         val params = HashMap<String, Any>()
         params["app_token"] = this.appId
         params["events"] = events.map { it.toMap() }
