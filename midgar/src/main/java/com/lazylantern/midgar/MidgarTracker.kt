@@ -84,35 +84,8 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         }
     }
 
-    private fun registerFragmentManager(activity: Activity?) {
-        if (activity is AppCompatActivity){
-            val fm = activity.supportFragmentManager
-            val callbacks = object: FragmentManager.FragmentLifecycleCallbacks(){
-                override fun onFragmentStarted(fm: FragmentManager, f: Fragment) {
-                    super.onFragmentStarted(fm, f)
-                    handleHierarchyChange(f.activity)
-                }
-
-                override fun onFragmentStopped(fm: FragmentManager, f: Fragment) {
-                    super.onFragmentStopped(fm, f)
-                    handleHierarchyChange(f.activity)
-                }
-
-            }
-            fm.registerFragmentLifecycleCallbacks(callbacks, true)
-            managers[fm] = callbacks
-        }
-    }
-
-    private fun unregisterFragmentManager(activity: Activity?) {
-        if (activity is AppCompatActivity){
-            val fm = activity.supportFragmentManager
-            val callbacks = managers[fm]
-            if(callbacks != null){
-                fm.unregisterFragmentLifecycleCallbacks(callbacks)
-                managers.remove(fm)
-            }
-        }
+    private fun createEvent(hierarchyHash: String): Event{
+        return Event(Event.TYPE_IMPRESSION, hierarchyHash, Event.SOURCE_ANDROID, Date().time)
     }
 
     private fun computeScreenHierarchyHash(activity: Activity?): String {
@@ -164,8 +137,35 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         }
     }
 
-    private fun createEvent(hierarchyHash: String): Event{
-        return Event(Event.TYPE_IMPRESSION, hierarchyHash, Event.SOURCE_ANDROID, Date().time)
+    private fun registerFragmentManager(activity: Activity?) {
+        if (activity is AppCompatActivity){
+            val fm = activity.supportFragmentManager
+            val callbacks = object: FragmentManager.FragmentLifecycleCallbacks(){
+                override fun onFragmentStarted(fm: FragmentManager, f: Fragment) {
+                    super.onFragmentStarted(fm, f)
+                    handleHierarchyChange(f.activity)
+                }
+
+                override fun onFragmentStopped(fm: FragmentManager, f: Fragment) {
+                    super.onFragmentStopped(fm, f)
+                    handleHierarchyChange(f.activity)
+                }
+
+            }
+            fm.registerFragmentLifecycleCallbacks(callbacks, true)
+            managers[fm] = callbacks
+        }
+    }
+
+    private fun unregisterFragmentManager(activity: Activity?) {
+        if (activity is AppCompatActivity){
+            val fm = activity.supportFragmentManager
+            val callbacks = managers[fm]
+            if(callbacks != null){
+                fm.unregisterFragmentLifecycleCallbacks(callbacks)
+                managers.remove(fm)
+            }
+        }
     }
 
     override fun onActivityPaused(activity: Activity?) {
