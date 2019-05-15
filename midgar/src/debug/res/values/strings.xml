@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="midgar_app_id"></string>
-    <string name="api_url">http://midgar-flask.herokuapp.com/api</string>
+    <string name="api_url">http://127.0.0.1:5000/api</string>
 </resources>

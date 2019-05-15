@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
 import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -251,8 +252,8 @@ class ApiService(private val appId: String, private val apiUrl: String) {
         }
     }
 
-    private fun createPostRequest(url: String, body: String): HttpsURLConnection {
-        val connection = URL(this.apiUrl + url ).openConnection() as HttpsURLConnection
+    private fun createPostRequest(url: String, body: String): HttpURLConnection {
+        val connection = URL(this.apiUrl + url ).openConnection() as HttpURLConnection
         with(connection){
             readTimeout = 3000
             connectTimeout = 3000
