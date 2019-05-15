@@ -18,8 +18,10 @@ import java.util.*
 import javax.net.ssl.HttpsURLConnection
 import kotlin.collections.HashMap
 import java.io.OutputStreamWriter
+import java.util.concurrent.TimeUnit
+import kotlin.collections.ArrayList
+import kotlin.concurrent.schedule
 import kotlin.coroutines.CoroutineContext
-
 
 open class MidgarApplication : Application(), Application.ActivityLifecycleCallbacks, CoroutineScope {
 
@@ -29,7 +31,9 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
     var lastHierarchyHash: String = ""
     var midgarAppId: String = ""
     var managers: HashMap<FragmentManager, FragmentManager.FragmentLifecycleCallbacks> = HashMap()
-    var hasBeenRemotelyKilled = true
+    var hasBeenRemotelyEnabled = false
+    var timer = Timer()
+    var eventsQueue: Queue<Event> = ArrayDeque<Event>()
     lateinit var apiService: ApiService
 
     override fun onCreate() {
@@ -47,15 +51,16 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
             throw RuntimeException("Midgar App ID not set")
         }
         apiService = ApiService(midgarAppId, getString(R.string.api_url))
-        this.hasBeenRemotelyKilled = apiService.checkAppStatus()
-        if(!hasBeenRemotelyKilled){
+        this.hasBeenRemotelyEnabled = apiService.checkAppIsEnabled()
+        if(hasBeenRemotelyEnabled){
             //Register activity lifecycle callback
             registerActivityLifecycleCallbacks(this)
-            //Listen for Fragment manager changes
+            startUploadLoop()
         }
     }
 
     private fun shutdown(){
+        stopUploadLoop()
         unregisterActivityLifecycleCallbacks(this)
         for ((manager, callback) in managers){
             manager.unregisterFragmentLifecycleCallbacks(callback)
@@ -67,6 +72,7 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
         val newHierarchyHash = computeScreenHierarchyHash(activity)
         if (newHierarchyHash != lastHierarchyHash){
             Log.d(MidgarApplication.TAG, "Got a new hierarchy: $newHierarchyHash")
+            eventsQueue.offer(createEvent(newHierarchyHash))
         }
     }
 
@@ -119,8 +125,35 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
         return "No Fragments"
     }
 
-    private fun checkIsAppEnabled(): Boolean {
-        return true
+    private fun startUploadLoop(){
+        timer.schedule(
+            UPLOAD_PERIOD_MS,
+            UPLOAD_PERIOD_MS,
+            uploadTimerTask()
+        )
+    }
+
+    private fun stopUploadLoop(){
+        timer.purge()
+    }
+
+    private fun uploadTimerTask(): TimerTask.() -> Unit {
+        return {
+            Log.d(MidgarApplication.TAG, "Processing batch")
+            val events = ArrayList<Event>()
+            dequeue@ while (!eventsQueue.isEmpty()) {
+                val event = eventsQueue.poll()
+                events.add(event)
+                if(events.size >= MAX_UPLOAD_BATCH_SIZE){
+                    continue@dequeue
+                }
+            }
+            launch { apiService.uploadBatch(events)}
+        }
+    }
+
+    private fun createEvent(hierarchyHash: String): Event{
+        return Event(Event.TYPE_IMPRESSION, hierarchyHash, Event.SOURCE_ANDROID, Date().time)
     }
 
     override fun onActivityPaused(activity: Activity?) {
@@ -142,17 +175,38 @@ open class MidgarApplication : Application(), Application.ActivityLifecycleCallb
 
     override fun onActivityStopped(activity: Activity?) { }
 
+    public fun stop(){
+        hasBeenRemotelyEnabled = false
+        shutdown()
+    }
+
     companion object {
         const val TAG = "MidgarSDK"
+        const val MAX_UPLOAD_BATCH_SIZE = 10
+        val UPLOAD_PERIOD_MS = TimeUnit.SECONDS.toMillis(60)
     }
 }
 
-data class Event(val type: String, val name: String, val source: String, val timestampMs: Date)
+data class Event(val type: String, val name: String, val source: String, val timestampMs: Long){
+    companion object {
+        const val TYPE_IMPRESSION = "impression"
+        const val SOURCE_ANDROID = "android"
+    }
+
+    fun toMap(): HashMap<String, Any>{
+         return HashMap<String, Any>().apply {
+            put("type", type)
+            put("screen",  name)
+            put("source", source)
+            put("timestamp", timestampMs)
+        }
+    }
+}
 
 class ApiService(val appId: String, val apiUrl: String) {
 
     @WorkerThread
-    suspend fun checkAppStatus(): Boolean{
+    suspend fun checkAppIsEnabled(): Boolean{
         val params = HashMap<String, String>()
         params["app_token"] = this.appId
         val connection = createPostRequest("/apps/kill", JSONObject(params).toString())
@@ -164,6 +218,21 @@ class ApiService(val appId: String, val apiUrl: String) {
         }
         Log.d(MidgarApplication.TAG,"Midgar App is DISABLED")
         return false
+    }
+
+    @WorkerThread
+    suspend fun uploadBatch(events: List<Event>){
+        val params = HashMap<String, Any>()
+        params["app_token"] = this.appId
+        params["events"] = events.map { it.toMap() }
+        val connection = createPostRequest("/events", JSONObject(params).toString())
+        connection.connect()
+        val responseCode = connection.responseCode
+        if(responseCode == 200){
+            Log.d(MidgarApplication.TAG,"Batch uploaded successfully")
+        } else {
+            Log.d(MidgarApplication.TAG,"Batch upload failed. Events got lost.")
+        }
     }
 
     private fun createPostRequest(url: String, body: String): HttpsURLConnection {
