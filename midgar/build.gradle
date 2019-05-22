@@ -1,7 +1,23 @@
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+apply plugin: 'com.novoda.bintray-release'
 
-group='com.lazylantern.midgar'
+def libraryVersion='0.2.0'
+
+publish {
+
+    def groupProjectID = 'com.lazylantern.midgar'
+    def artifactProjectID = 'midgar-android'
+
+    userOrg = 'lazylantern'
+    repoName = 'midgar-android'
+    groupId = groupProjectID
+    artifactId = artifactProjectID
+    publishVersion = libraryVersion
+    desc = 'Midgar Android SDK'
+    website = 'https://github.com/lazylantern/midgar-android'
+
+}
 
 android {
     compileSdkVersion 28
@@ -11,7 +27,7 @@ android {
         minSdkVersion 21
         targetSdkVersion 28
         versionCode 1
-        versionName "0.2.0"
+        versionName libraryVersion
 
         archivesBaseName = "midgar-$versionName"
     }
