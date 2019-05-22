@@ -11,6 +11,9 @@ import androidx.annotation.WorkerThread
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.OnLifecycleEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -24,8 +27,12 @@ import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 import kotlin.concurrent.schedule
 import kotlin.coroutines.CoroutineContext
+import androidx.lifecycle.ProcessLifecycleOwner
 
-class MidgarTracker private constructor(app: Application) : Application.ActivityLifecycleCallbacks, CoroutineScope  {
+
+
+class MidgarTracker private constructor(app: Application) : Application.ActivityLifecycleCallbacks, CoroutineScope,
+    LifecycleObserver {
 
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.IO
@@ -38,7 +45,6 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
     private var timer = Timer()
     private var eventsQueue: Queue<Event> = ArrayDeque<Event>()
     private lateinit var apiService: ApiService
-    private var numActivitiesStarted = 0
 
     init {
         init(app)
@@ -126,10 +132,12 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
 
     private fun registerLifecycleCallbaks(app: Application){
         app.registerActivityLifecycleCallbacks(this)
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
     }
 
     private fun unregisterLifecycleCallbacks(app: Application){
         app.unregisterActivityLifecycleCallbacks(this)
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
     }
 
     private fun startUploadLoop(){
@@ -223,21 +231,21 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
 
     override fun onActivityCreated(activity: Activity?, savedInstanceState: Bundle?) { }
 
-    override fun onActivityStarted(activity: Activity?) {
-        if (numActivitiesStarted == 0) {
-            eventsQueue.offer(createEvent("", Event.TYPE_FOREGROUND))
-        }
-        numActivitiesStarted++
-    }
+    override fun onActivityStarted(activity: Activity?) { }
 
-    override fun onActivityStopped(activity: Activity?) {
-        numActivitiesStarted--
-        if (numActivitiesStarted == 0) {
-            eventsQueue.offer(createEvent("", Event.TYPE_BACKGROUND))
-        }
-    }
+    override fun onActivityStopped(activity: Activity?) { }
 
     override fun onActivitySaveInstanceState(activity: Activity?, outState: Bundle?) { }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_START)
+    private fun onMoveToForeground() {
+        eventsQueue.offer(createEvent("", Event.TYPE_FOREGROUND))
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
+    private fun onMoveToBackground() {
+        eventsQueue.offer(createEvent("", Event.TYPE_BACKGROUND))
+    }
 
     fun startTracker(app: Application){
         if(getPersistedKillSwitchState(app)){
@@ -321,8 +329,8 @@ class ApiService(private val appId: String, private val apiUrl: String) {
     private fun createPostRequest(url: String, body: String): HttpURLConnection {
         val connection = URL(this.apiUrl + url ).openConnection() as HttpURLConnection
         with(connection){
-            readTimeout = 3000
-            connectTimeout = 3000
+            readTimeout = 30000
+            connectTimeout = 30000
             requestMethod = "POST"
             doInput = true
             doOutput = true
