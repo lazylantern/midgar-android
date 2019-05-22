@@ -1,8 +1,10 @@
 package com.lazylantern.midgar
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.appcompat.app.AppCompatActivity
@@ -17,7 +19,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.HttpsURLConnection
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 import kotlin.concurrent.schedule
@@ -30,19 +31,26 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
 
     private var lastHierarchyHash: String = ""
     private var midgarAppId: String = ""
+    private var midgarDeviceId: String = ""
     private var managers: HashMap<FragmentManager, FragmentManager.FragmentLifecycleCallbacks> = HashMap()
     private var hasBeenRemotelyEnabled = false
     private var timer = Timer()
     private var eventsQueue: Queue<Event> = ArrayDeque<Event>()
     private lateinit var apiService: ApiService
+    private var numActivitiesStarted = 0
 
     init {
         init(app)
         Log.d(TAG,"Midgar has initialized")
     }
 
+    @SuppressLint("HardwareIds")
     private fun init(app: Application) {
         midgarAppId = app.getString(R.string.midgar_app_id)
+        midgarDeviceId = Settings.Secure.getString(
+            app.contentResolver,
+            Settings.Secure.ANDROID_ID
+        )
         if (midgarAppId.isBlank()){
             throw RuntimeException("Midgar App ID not set")
         }
@@ -60,7 +68,6 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         } catch (e: Exception){
             Log.e(TAG, "Midgar failed to start:", e)
         }
-
     }
 
     private fun shutdown(app: Application){
@@ -81,12 +88,18 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         val newHierarchyHash = computeScreenHierarchyHash(activity)
         if (newHierarchyHash != lastHierarchyHash){
             Log.d(TAG, "Got a new hierarchy: $newHierarchyHash")
-            eventsQueue.offer(createEvent(newHierarchyHash))
+            eventsQueue.offer(createEvent(newHierarchyHash, Event.TYPE_IMPRESSION))
         }
     }
 
-    private fun createEvent(hierarchyHash: String): Event{
-        return Event(Event.TYPE_IMPRESSION, hierarchyHash, Event.SOURCE_ANDROID, Date().time)
+    private fun createEvent(hierarchyHash: String, type: String): Event{
+        return Event(
+            type,
+            hierarchyHash,
+            Date().time,
+            Event.PLATFORM_ANDROID,
+            Event.SDK_KOTLIN,
+            this.midgarDeviceId)
     }
 
     private fun computeScreenHierarchyHash(activity: Activity?): String {
@@ -184,11 +197,21 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
 
     override fun onActivityCreated(activity: Activity?, savedInstanceState: Bundle?) { }
 
-    override fun onActivityStarted(activity: Activity?) { }
+    override fun onActivityStarted(activity: Activity?) {
+        if (numActivitiesStarted == 0) {
+            eventsQueue.offer(createEvent("", Event.TYPE_FOREGROUND))
+        }
+        numActivitiesStarted++
+    }
+
+    override fun onActivityStopped(activity: Activity?) {
+        numActivitiesStarted--
+        if (numActivitiesStarted == 0) {
+            eventsQueue.offer(createEvent("", Event.TYPE_BACKGROUND))
+        }
+    }
 
     override fun onActivitySaveInstanceState(activity: Activity?, outState: Bundle?) { }
-
-    override fun onActivityStopped(activity: Activity?) { }
 
     fun startTracker(app: Application){
         launch { start(app) }
@@ -206,18 +229,28 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
     }
 }
 
-data class Event(val type: String, val name: String, val source: String, val timestampMs: Long){
+data class Event(val type: String,
+                 val name: String,
+                 val timestampMs: Long,
+                 val platform: String,
+                 val sdk: String,
+                 val deviceId: String){
     companion object {
+        const val TYPE_BACKGROUND = "background"
+        const val TYPE_FOREGROUND = "foreground"
         const val TYPE_IMPRESSION = "impression"
-        const val SOURCE_ANDROID = "android"
+        const val PLATFORM_ANDROID = "android"
+        const val SDK_KOTLIN = "kotlin"
     }
 
     fun toMap(): HashMap<String, Any>{
          return HashMap<String, Any>().apply {
             put("type", type)
             put("screen",  name)
-            put("source", source)
             put("timestamp", timestampMs)
+            put("platform", platform)
+            put("sdk", sdk)
+            put("device_id", deviceId)
         }
     }
 }
