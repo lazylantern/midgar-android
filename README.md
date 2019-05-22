@@ -2,6 +2,11 @@
 
 [![CircleCI](https://circleci.com/gh/lazylantern/midgar-android.svg?style=svg)](https://circleci.com/gh/lazylantern/midgar-android) [![GitHub release](https://img.shields.io/github/tag/lazylantern/midgar-android.svg)](https://github.com/lazylantern/midgar-android/releases)
 
+## Requirements
+ - Android API >= 21
+ - Kotlin enabled project
+ - AndroidX project. Still using Android support libraries? We can help you migrate!
+
 ## Integration
 The Midgar Android SDK is written in Kotlin and available through Bintray/JCenter (at the time of writing, Bintray only)
 
