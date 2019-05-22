@@ -3,6 +3,7 @@ package com.lazylantern.midgar
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
+import android.content.Context
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
@@ -54,15 +55,18 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         if (midgarAppId.isBlank()){
             throw RuntimeException("Midgar App ID not set")
         }
+        apiService = ApiService(midgarAppId, app.getString(R.string.api_url))
     }
 
     private fun start(app: Application){
-        apiService = ApiService(midgarAppId, app.getString(R.string.api_url))
         try{
             this.hasBeenRemotelyEnabled = apiService.checkAppIsEnabled()
+            val wasPreviouslyRunning = getPersistedKillSwitchState(app)
+            if(!wasPreviouslyRunning){
+                registerLifecycleCallbaks(app)
+            }
+            persistKillSwitchState(app, this.hasBeenRemotelyEnabled)
             if(hasBeenRemotelyEnabled){
-                //Register activity lifecycle callback
-                app.registerActivityLifecycleCallbacks(this)
                 startUploadLoop()
             }
         } catch (e: Exception){
@@ -73,7 +77,7 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
     private fun shutdown(app: Application){
         try {
             stopUploadLoop()
-            app.unregisterActivityLifecycleCallbacks(this)
+            unregisterLifecycleCallbacks(app)
             for ((manager, callback) in managers){
                 manager.unregisterFragmentLifecycleCallbacks(callback)
             }
@@ -118,6 +122,14 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
             return sb.toString()
         }
         return "No Fragments"
+    }
+
+    private fun registerLifecycleCallbaks(app: Application){
+        app.registerActivityLifecycleCallbacks(this)
+    }
+
+    private fun unregisterLifecycleCallbacks(app: Application){
+        app.unregisterActivityLifecycleCallbacks(this)
     }
 
     private fun startUploadLoop(){
@@ -184,6 +196,20 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         }
     }
 
+    private fun persistKillSwitchState(app: Application, isAppEnabled: Boolean){
+        app.getSharedPreferences(
+            app.getString(R.string.shared_preferences_store), Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(app.getString(R.string.shared_preferences_kill_switch_key), isAppEnabled)
+            .apply()
+    }
+
+    private fun getPersistedKillSwitchState(app: Application): Boolean {
+        return  app.getSharedPreferences(
+            app.getString(R.string.shared_preferences_store), Context.MODE_PRIVATE)
+            .getBoolean(app.getString(R.string.shared_preferences_kill_switch_key), false)
+    }
+
     override fun onActivityPaused(activity: Activity?) {
         unregisterFragmentManager(activity)
     }
@@ -214,6 +240,11 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
     override fun onActivitySaveInstanceState(activity: Activity?, outState: Bundle?) { }
 
     fun startTracker(app: Application){
+        if(getPersistedKillSwitchState(app)){
+            // Start to capture events right away of persisted kill switch is positive
+            // This ensures we can capture the first screen before we have a kill switch answer from the network.
+            registerLifecycleCallbaks(app)
+        }
         launch { start(app) }
     }
 

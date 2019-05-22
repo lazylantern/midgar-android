@@ -2,4 +2,6 @@
 <resources>
     <string name="midgar_app_id"></string>
     <string name="api_url">http://midgar-flask.herokuapp.com/api</string>
+    <string name="shared_preferences_store">Kill_switch_persistence</string>
+    <string name="shared_preferences_kill_switch_key">Kill_switch</string>
 </resources>
