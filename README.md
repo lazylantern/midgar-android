@@ -7,15 +7,6 @@ The Midgar Android SDK is written in Kotlin and available through Bintray/JCente
 
 To get started with the Integration, you must first include the SDK in your dependencies.
 
-### Add the bintray repo (this step to be removed)
-In your
-root `build.gradle`, add the following line in the `repositories` section:
-
-```gradle
-    maven {
-        url  "https://dl.bintray.com/lazylantern/midgar-android"
-    }
-```
 ### Add the SDK dependency
 
 In your `app/build.gradle` file:
