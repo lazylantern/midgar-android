@@ -1,7 +1,42 @@
-# midgar-android
-Midgar Android SDK
+# Midgar UX Tracker - Android SDK
 
+[![CircleCI](https://circleci.com/gh/lazylantern/midgar-android.svg?style=svg)](https://circleci.com/gh/lazylantern/midgar-android) [![GitHub release](https://img.shields.io/github/tag/lazylantern/midgar-android.svg)](https://github.com/lazylantern/midgar-android/releases)
 
-Coming soon
+## Integration
+The Midgar Android SDK is written in Kotlin and available through Bintray/JCenter (at the time of writing, Bintray only)
 
-[![CircleCI](https://circleci.com/gh/lazylantern/midgar-android.svg?style=svg)](https://circleci.com/gh/lazylantern/midgar-android)
+To get started with the Integration, you must first include the SDK in your dependencies.
+
+### Add the bintray repo (this step to be removed)
+In your
+root `build.gradle`, add the following line in the `repositories` section:
+
+```gradle
+    maven {
+        url  "https://dl.bintray.com/lazylantern/midgar-android"
+    }
+```
+### Add the SDK dependency
+
+In your `app/build.gradle` file:
+```gradle
+implementation 'com.lazylantern.midgar:midgar-android:LATEST_VERSION'
+```
+
+### Provide the appId res
+Create a `string` resource in your app:
+
+```xml
+<string name="midgar_app_id">YOUR_APP_ID</string>
+```
+
+Replace `YOUR_APP_ID` with the id the Lazy Lantern team provided you with.
+
+### Initialize the SDK
+In your `Application`'s `onCreate(...)` method, initialize the SDK:
+
+```java
+MidgarTracker.getInstance(this).startTracker(this)
+```
+
+That's it! Midgar is ready to work for you. Stay tuned for anomalies reports.
