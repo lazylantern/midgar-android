@@ -42,6 +42,7 @@ class MidgarTracker private constructor(app: Application) : ActivityLifecycleCal
     private lateinit var apiService: ApiService
     private var sessionId: String? = null
     private var timeOfLastBackgroundEvent: Long = Long.MAX_VALUE
+    private var contextInfo = ContextInfoBuilder().buildContextInfo(app)
 
     init {
         init(app)
@@ -107,7 +108,8 @@ class MidgarTracker private constructor(app: Application) : ActivityLifecycleCal
             Event.PLATFORM_ANDROID,
             Event.SDK_KOTLIN,
             this.midgarDeviceId,
-            this.getSessionId())
+            this.getSessionId(),
+            contextInfo)
     }
 
     private fun computeScreenHierarchyHash(activity: Activity?): String {

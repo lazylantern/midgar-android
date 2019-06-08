@@ -6,7 +6,8 @@ data class Event(val type: String,
                  val platform: String,
                  val sdk: String,
                  val deviceId: String,
-                 val sessionId: String){
+                 val sessionId: String,
+                 val contextInfo: ContextInfo){
     companion object {
         const val TYPE_BACKGROUND = "background"
         const val TYPE_FOREGROUND = "foreground"
@@ -24,6 +25,7 @@ data class Event(val type: String,
             put("sdk", sdk)
             put("device_id", deviceId)
             put("session_id", sessionId)
+            putAll(contextInfo.toMap())
         }
     }
 }
