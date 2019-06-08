@@ -4,34 +4,29 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
-import androidx.annotation.WorkerThread
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
+import androidx.lifecycle.ProcessLifecycleOwner
+import com.lazylantern.midgar.api.ApiService
+import com.lazylantern.midgar.models.Event
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 import kotlin.concurrent.schedule
 import kotlin.coroutines.CoroutineContext
-import androidx.lifecycle.ProcessLifecycleOwner
 
 
-
-class MidgarTracker private constructor(app: Application) : Application.ActivityLifecycleCallbacks, CoroutineScope,
+class MidgarTracker private constructor(app: Application) : ActivityLifecycleCallbacks(), CoroutineScope,
     LifecycleObserver {
 
     override val coroutineContext: CoroutineContext
@@ -248,16 +243,6 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         handleHierarchyChange(activity)
     }
 
-    override fun onActivityDestroyed(activity: Activity?) { }
-
-    override fun onActivityCreated(activity: Activity?, savedInstanceState: Bundle?) { }
-
-    override fun onActivityStarted(activity: Activity?) { }
-
-    override fun onActivityStopped(activity: Activity?) { }
-
-    override fun onActivitySaveInstanceState(activity: Activity?, outState: Bundle?) { }
-
     @OnLifecycleEvent(Lifecycle.Event.ON_START)
     private fun onMoveToForeground() {
         eventsQueue.offer(createEvent("", Event.TYPE_FOREGROUND))
@@ -288,106 +273,5 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         const val MAX_UPLOAD_BATCH_SIZE = 10
         val UPLOAD_PERIOD_MS = TimeUnit.SECONDS.toMillis(60)
         val SESSION_MAX_LENGTH_MS = TimeUnit.MINUTES.toMillis(10)
-    }
-}
-
-data class Event(val type: String,
-                 val name: String,
-                 val timestampMs: Long,
-                 val platform: String,
-                 val sdk: String,
-                 val deviceId: String,
-                 val sessionId: String){
-    companion object {
-        const val TYPE_BACKGROUND = "background"
-        const val TYPE_FOREGROUND = "foreground"
-        const val TYPE_IMPRESSION = "impression"
-        const val PLATFORM_ANDROID = "android"
-        const val SDK_KOTLIN = "kotlin"
-    }
-
-    fun toMap(): HashMap<String, Any>{
-         return HashMap<String, Any>().apply {
-            put("type", type)
-            put("screen",  name)
-            put("timestamp", timestampMs)
-            put("platform", platform)
-            put("sdk", sdk)
-            put("device_id", deviceId)
-            put("session_id", sessionId)
-        }
-    }
-}
-
-class ApiService(private val appId: String, private val apiUrl: String) {
-
-    @WorkerThread
-    fun checkAppIsEnabled(): Boolean{
-        val params = HashMap<String, String>()
-        params["app_token"] = this.appId
-        val connection = createPostRequest("/apps/kill", JSONObject(params).toString())
-        connection.connect()
-        val responseCode = connection.responseCode
-        if(responseCode == 200){
-            Log.d(MidgarTracker.TAG,"Midgar App is enabled")
-            return true
-        }
-        Log.d(MidgarTracker.TAG,"Midgar App is DISABLED")
-        return false
-    }
-
-    @WorkerThread
-    fun uploadBatch(events: List<Event>){
-        val params = HashMap<String, Any>()
-        params["app_token"] = this.appId
-        params["events"] = events.map { it.toMap() }
-        val connection = createPostRequest("/events", JSONObject(params).toString())
-        connection.connect()
-        val responseCode = connection.responseCode
-        if(responseCode < 400){
-            Log.d(MidgarTracker.TAG,"Batch uploaded successfully")
-        } else {
-            Log.d(MidgarTracker.TAG,"Batch upload failed. Events got lost.")
-        }
-    }
-
-    private fun createPostRequest(url: String, body: String): HttpURLConnection {
-        val connection = URL(this.apiUrl + url ).openConnection() as HttpURLConnection
-        with(connection){
-            readTimeout = 30000
-            connectTimeout = 30000
-            requestMethod = "POST"
-            doInput = true
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-        }
-        val out = OutputStreamWriter(connection.outputStream        )
-        out.write(body)
-        out.close()
-        return connection
-    }
-}
-
-open class SingletonHolder<out T, in A>(creator: (A) -> T) {
-    private var creator: ((A) -> T)? = creator
-    @Volatile private var instance: T? = null
-
-    fun getInstance(arg: A): T {
-        val i = instance
-        if (i != null) {
-            return i
-        }
-
-        return synchronized(this) {
-            val i2 = instance
-            if (i2 != null) {
-                i2
-            } else {
-                val created = creator!!(arg)
-                instance = created
-                creator = null
-                created
-            }
-        }
     }
 }
