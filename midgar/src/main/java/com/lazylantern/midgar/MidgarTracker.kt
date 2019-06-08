@@ -45,6 +45,8 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
     private var timer = Timer()
     private var eventsQueue: Queue<Event> = ArrayDeque<Event>()
     private lateinit var apiService: ApiService
+    private var sessionId: String? = null
+    private var timeOfLastBackgroundEvent: Long = Long.MAX_VALUE
 
     init {
         init(app)
@@ -109,7 +111,8 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
             Date().time,
             Event.PLATFORM_ANDROID,
             Event.SDK_KOTLIN,
-            this.midgarDeviceId)
+            this.midgarDeviceId,
+            this.getSessionId())
     }
 
     private fun computeScreenHierarchyHash(activity: Activity?): String {
@@ -218,6 +221,24 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
             .getBoolean(app.getString(R.string.shared_preferences_kill_switch_key), false)
     }
 
+    private fun getSessionId(): String{
+        if(sessionId == null || !checkSessionIdValidity()){
+            sessionId = generateSessionId()
+        }
+        return sessionId as String
+    }
+
+    private fun checkSessionIdValidity(): Boolean{
+        return System.currentTimeMillis() - timeOfLastBackgroundEvent < SESSION_MAX_LENGTH_MS
+    }
+
+    private fun generateSessionId():String {
+        val allowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz0123456789"
+        return (1..10)
+            .map { allowedChars.random() }
+            .joinToString("")
+    }
+
     override fun onActivityPaused(activity: Activity?) {
         unregisterFragmentManager(activity)
     }
@@ -245,6 +266,7 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
     @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     private fun onMoveToBackground() {
         eventsQueue.offer(createEvent("", Event.TYPE_BACKGROUND))
+        timeOfLastBackgroundEvent  = System.currentTimeMillis()
     }
 
     fun startTracker(app: Application){
@@ -265,6 +287,7 @@ class MidgarTracker private constructor(app: Application) : Application.Activity
         const val TAG = "MidgarSDK"
         const val MAX_UPLOAD_BATCH_SIZE = 10
         val UPLOAD_PERIOD_MS = TimeUnit.SECONDS.toMillis(60)
+        val SESSION_MAX_LENGTH_MS = TimeUnit.MINUTES.toMillis(10)
     }
 }
 
@@ -273,7 +296,8 @@ data class Event(val type: String,
                  val timestampMs: Long,
                  val platform: String,
                  val sdk: String,
-                 val deviceId: String){
+                 val deviceId: String,
+                 val sessionId: String){
     companion object {
         const val TYPE_BACKGROUND = "background"
         const val TYPE_FOREGROUND = "foreground"
@@ -290,6 +314,7 @@ data class Event(val type: String,
             put("platform", platform)
             put("sdk", sdk)
             put("device_id", deviceId)
+            put("session_id", sessionId)
         }
     }
 }

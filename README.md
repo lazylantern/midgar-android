@@ -1,6 +1,6 @@
 # Midgar UX Tracker - Android SDK
 
-[![CircleCI](https://circleci.com/gh/lazylantern/midgar-android.svg?style=svg)](https://circleci.com/gh/lazylantern/midgar-android) [![GitHub release](https://img.shields.io/github/tag/lazylantern/midgar-android.svg)](https://github.com/lazylantern/midgar-android/releases)
+[![CircleCI](https://circleci.com/gh/lazylantern/midgar-android.svg?style=svg)](https://circleci.com/gh/lazylantern/midgar-android) [![GitHub release](https://img.shields.io/github/release-pre/lazylantern/midgar-android.svg)](https://github.com/lazylantern/midgar-android/releases)
 
 ## Requirements
  - Android API >= 21
