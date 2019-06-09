@@ -231,7 +231,7 @@ class MidgarTracker private constructor(app: Application) : ActivityLifecycleCal
 
     private fun generateSessionId():String {
         val allowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz0123456789"
-        return (1..10)
+        return (1..6)
             .map { allowedChars.random() }
             .joinToString("")
     }
