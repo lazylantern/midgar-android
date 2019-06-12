@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="com.lazylantern.midgar">
+          package="com.lazylantern.midgar.sample">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
-            android:name=".sample.SampleApplication"
+            android:name=".SampleApplication"
             android:networkSecurityConfig="@xml/network_security_config"
             android:allowBackup="true"
             android:icon="@mipmap/ic_launcher"
@@ -15,12 +15,12 @@
             android:supportsRtl="true"
             android:theme="@style/AppTheme">
         <activity
-                android:name=".sample.SubActivity"
+                android:name=".SubActivity"
                 android:label="@string/title_activity_sub"
                 android:theme="@style/AppTheme.NoActionBar">
         </activity>
         <activity
-                android:name=".sample.SampleActivity"
+                android:name=".SampleActivity"
                 android:icon="@mipmap/ic_launcher"
                 android:label="@string/title_activity_sample"
                 android:theme="@style/AppTheme.NoActionBar">

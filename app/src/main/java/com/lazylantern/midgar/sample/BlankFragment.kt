@@ -6,8 +6,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 
-import com.lazylantern.midgar.R
-
 class BlankFragment : Fragment() {
 
     override fun onCreateView(
